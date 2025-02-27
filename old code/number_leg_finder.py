@@ -8,3 +8,11 @@ def number_leg_finder(leg_set):
         if val > 0:
             count += 1
     return count
+
+
+# TODO: Product finder for the given leg
+
+# DAVN matrxix, positive nhumber product on the leg, product number is the same as the 
+
+# 24 products, 24 rows, 
+
