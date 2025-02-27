@@ -1,6 +1,9 @@
 import numpy as np
 from scipy.optimize import linprog
 
+# TODO: Streamlit version to add the input and calculate the  output (optimized).
+
+
 '''
 Note: 
 Two issues:
