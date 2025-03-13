@@ -120,3 +120,4 @@ print(-fval)
 # Calculate DAVN matrix directly instead of importing from another file
 davn = davn_generator(shadow_prices, fare, product_to_legs, NUMBER_OF_PRODUCTS, NUMBER_OF_LEGS)
 print("\nDAVN matrix:\n", davn)
+print("\n DAVN Shape:", davn.shape)
