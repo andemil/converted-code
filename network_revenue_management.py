@@ -71,6 +71,7 @@ def network_revenue_management(fares=None, demand=None, capacity=None, product_t
             84, 58.8, 14.7, 16.8, 12.6, 14.7, 16.8, 12.6, 21, 25.2,
             21, 18.9, 21, 14.7
         ])
+        
     
     if capacity is None:
         capacity = np.array([100, 100, 100, 100, 100, 100])

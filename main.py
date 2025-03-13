@@ -42,5 +42,6 @@ if __name__ == "__main__":
     run_emsr_example()
     
     # Uncomment to run examples with custom parameters
-    # run_custom_network_example()
-    # run_custom_emsr_example()
+    run_custom_network_example()
+    run_custom_emsr_example()
+
