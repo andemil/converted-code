@@ -81,7 +81,7 @@ def display_results(results, data):
     
     # Detailed EMSR-b results in expandable sections
     for leg, result in emsr_results.items():
-        with st.expander(f"Leg {leg} Details"):
+        with st.expander(f"Leg {leg+1} Details"):
             if "message" in result:
                 st.write(result["message"])
                 continue
