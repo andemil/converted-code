@@ -1,8 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from davn_book_pulp import davn_generator, products_on_leg_finder
-import pulp
-from davn_utils import extract_leg_fare_classes
+from davn_utils import products_on_leg_finder, davn_generator, extract_leg_fare_classes
+from davn_optimization import optimize_with_scipy
 
 def calculate_emsr_b(fares, mean_demands, probabilities, capacity):
     """
@@ -156,32 +155,9 @@ def run_davn_emsr_b_example():
         [1, 2],  [0, 3],  [1, 4],  [0, 5],  [3, 4],  [2, 5]
     ])
 
-    # Create a PuLP maximization problem (similar to davn_book_pulp.py)
-    prob = pulp.LpProblem("Revenue_Maximization", pulp.LpMaximize)
-    Z = pulp.LpVariable.dicts("Z", range(NUMBER_OF_PRODUCTS), lowBound=0)
-    
-    # Add objective function
-    prob += pulp.lpSum([fare[i] * Z[i] for i in range(NUMBER_OF_PRODUCTS)])
-    
-    # Add demand constraints
-    for i in range(NUMBER_OF_PRODUCTS):
-        prob += Z[i] <= demand[i], f"Demand_Constraint_{i}"
-    
-    # Add capacity constraints
-    for leg in range(NUMBER_OF_LEGS):
-        prod_list = products_on_leg_finder(leg, product_to_legs)
-        if prod_list:
-            prob += pulp.lpSum([Z[j] for j in prod_list]) <= capacity[leg], f"Capacity_Constraint_{leg}"
-    
-    # Solve the problem
-    prob.solve(pulp.PULP_CBC_CMD(msg=False))
-    
-    # Get shadow prices for the capacity constraints
-    shadow_prices = np.zeros(NUMBER_OF_LEGS)
-    for leg in range(NUMBER_OF_LEGS):
-        constraint_name = f"Capacity_Constraint_{leg}"
-        if constraint_name in prob.constraints:
-            shadow_prices[leg] = prob.constraints[constraint_name].pi
+    # Run optimization using SciPy (replacing PuLP)
+    results = optimize_with_scipy(fare, demand, capacity, product_to_legs)
+    shadow_prices = results['shadow_prices']
     
     # Calculate DAVN matrix
     davn = davn_generator(shadow_prices, fare, product_to_legs, NUMBER_OF_PRODUCTS, NUMBER_OF_LEGS)

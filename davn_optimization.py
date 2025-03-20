@@ -1,5 +1,4 @@
 import numpy as np
-import pulp
 from scipy.optimize import linprog
 from davn_utils import products_on_leg_finder, davn_generator
 
@@ -69,51 +68,4 @@ def optimize_with_scipy(fare, demand, capacity, product_to_legs):
         'davn_matrix': davn_matrix
     }
 
-def optimize_with_pulp(fare, demand, capacity, product_to_legs):
-    """Solve the DAVN optimization problem using PuLP"""
-    NUMBER_OF_PRODUCTS = len(fare)
-    NUMBER_OF_LEGS = len(capacity)
-    
-    # Create a PuLP maximization problem
-    prob = pulp.LpProblem("Revenue_Maximization", pulp.LpMaximize)
-
-    # Create decision variables
-    Z = pulp.LpVariable.dicts("Z", range(NUMBER_OF_PRODUCTS), lowBound=0)
-
-    # Add objective function: maximize revenue
-    prob += pulp.lpSum([fare[i] * Z[i] for i in range(NUMBER_OF_PRODUCTS)])
-
-    # Add demand constraints
-    for i in range(NUMBER_OF_PRODUCTS):
-        prob += Z[i] <= demand[i], f"Demand_Constraint_{i}"
-
-    # Add capacity constraints
-    for leg in range(NUMBER_OF_LEGS):
-        # Get products using this leg
-        prod_list = products_on_leg_finder(leg, product_to_legs)
-        if prod_list:
-            prob += pulp.lpSum([Z[j] for j in prod_list]) <= capacity[leg], f"Capacity_Constraint_{leg}"
-
-    # Solve the problem
-    prob.solve(pulp.PULP_CBC_CMD(msg=False))
-
-    # Extract results
-    x = np.array([Z[i].value() for i in range(NUMBER_OF_PRODUCTS)])
-    optimal_value = pulp.value(prob.objective)
-
-    # Get shadow prices (dual values) for the capacity constraints
-    shadow_prices = np.zeros(NUMBER_OF_LEGS)
-    for leg in range(NUMBER_OF_LEGS):
-        constraint_name = f"Capacity_Constraint_{leg}"
-        if constraint_name in prob.constraints:
-            shadow_prices[leg] = prob.constraints[constraint_name].pi
-    
-    # Calculate DAVN matrix
-    davn_matrix = davn_generator(shadow_prices, fare, product_to_legs, NUMBER_OF_PRODUCTS, NUMBER_OF_LEGS)
-    
-    return {
-        'optimal_solution': x,
-        'optimal_value': optimal_value,
-        'shadow_prices': shadow_prices,
-        'davn_matrix': davn_matrix
-    }
+# Removed the optimize_with_pulp function since it's not used
