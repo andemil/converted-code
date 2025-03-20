@@ -1,92 +1,128 @@
 import numpy as np
-from scipy.stats import poisson
+from davn_utils import extract_leg_fare_classes
 
-def emsr_b(fares=None, cancel_prob=0.20, capacity=100, arrival_rate=1.4, 
-           time_horizon=100, prob_class=None):
+def calculate_emsr_b(fares, mean_demands, probabilities, capacity):
     """
-    Compute EMSR-b protection levels and booking limits for a set of fare classes.
+    Implements the EMSR-b algorithm for revenue management.
     
     Parameters:
-    -----------
-    fares : array-like
-        Fares for each class (should be in increasing order)
-    cancel_prob : float
-        Probability of cancellation
-    capacity : float
-        Aircraft seat capacity
-    arrival_rate : float
-        Arrival rate per day
-    time_horizon : float
-        Time horizon in days
-    prob_class : array-like
-        Probability of requests for each fare class
-        
+    fares -- array of fares in descending order (highest fare first)
+    mean_demands -- array of mean demands corresponding to the fares
+    probabilities -- array of probabilities for each fare class
+    capacity -- total capacity available
+    
     Returns:
-    --------
-    fares : array
-        Fares for each class
-    booking_limits : array
-        Booking limits for each class
+    protection_levels -- array of protection levels
+    booking_limits -- array of booking limits
+    expected_revenue -- expected revenue from this leg
     """
-    # Default values if parameters are not provided
-    if fares is None:
-        fares = np.array([101, 127, 153, 179, 293, 419])
+    # Number of fare classes
+    n = len(fares)
     
-    if prob_class is None:
-        prob_class = np.array([0.3, 0.3, 0.13, 0.13, 0.09, 0.05])
+    # Sort fares, demands, and probabilities in descending order of fares
+    sorted_indices = np.argsort(fares)[::-1]  # descending
+    fares = fares[sorted_indices]
+    mean_demands = mean_demands[sorted_indices]
+    probabilities = probabilities[sorted_indices]
     
-    # Validate input dimensions
-    num_classes = len(fares)
-    if len(prob_class) != num_classes:
-        raise ValueError("Probability array must have same length as fares array")
+    # Initialize protection levels
+    protection_levels = np.zeros(n)
     
-    # Verify fares are in increasing order
-    if not np.all(np.diff(fares) >= 0):
-        print("Warning: Fares should ideally be in increasing order for EMSR-b")
-    
-    # Compute expected (mean) demand for each fare class
-    mean_demand = arrival_rate * time_horizon * prob_class
-    
-    # Compute aggregate demands and weighted average fares (clustering from highest fare)
-    aggregate_demand = np.zeros(num_classes)
-    aggregate_fare = np.zeros(num_classes)
-    total_demand = 0
-    total_weighted_fare = 0
-    
-    # Process in reverse order (from highest to lowest fare)
-    for j in range(num_classes - 1, -1, -1):
-        total_demand += mean_demand[j]
-        total_weighted_fare += fares[j] * mean_demand[j]
-        aggregate_demand[j] = total_demand
-        aggregate_fare[j] = total_weighted_fare / total_demand
-    
-    protection_levels = np.zeros(num_classes)
-    protection_levels[0] = 0  # for the highest fare class, protection is 0
-    
-    # Compute protection levels for lower fare classes
-    for i in range(num_classes - 1):
-        # Calculate the fraction used in the inverse Poisson calculation
-        fraction = (aggregate_fare[i+1] - fares[i]) / aggregate_fare[i+1]
-        if fraction <= 0:  # Edge case check
-            protection_levels[i+1] = 0
+    # EMSR-b algorithm
+    for i in range(1, n):
+        # Calculate weighted average fare for classes 1 to i
+        weighted_fare = sum(fares[j] * mean_demands[j] for j in range(i)) / sum(mean_demands[j] for j in range(i))
+        
+        # Calculate protection level for fare classes 1 to i against class i+1
+        # This simplified version uses the provided probabilities
+        total_demand = sum(mean_demands[j] for j in range(i))
+        adjusted_prob = sum(probabilities[j] * mean_demands[j] for j in range(i)) / total_demand if total_demand > 0 else 0
+        
+        # Protection level calculation (simple approach based on probability thresholds)
+        if fares[i] > 0:
+            threshold = 1 - (fares[i] / weighted_fare) if weighted_fare > 0 else 0
+            protection_level = total_demand * min(max(adjusted_prob - threshold, 0), 1)
         else:
-            # Use the Poisson inverse (percent point function)
-            protection_levels[i+1] = poisson.ppf(fraction, aggregate_demand[i+1])
+            protection_level = 0
+            
+        protection_levels[i-1] = protection_level
     
-    # Adjust capacity for cancellations
-    C_adjusted = capacity / (1 - cancel_prob)
+    # Calculate booking limits
+    booking_limits = np.zeros(n)
+    remaining = capacity
+    for i in range(n):
+        if i == 0:
+            booking_limits[i] = min(remaining, mean_demands[i])
+        else:
+            booking_limits[i] = min(remaining, max(0, mean_demands[i] - protection_levels[i-1]))
+        remaining -= booking_limits[i]
     
-    # Compute booking limits for each fare class
-    booking_limits = np.zeros(num_classes)
-    for i in range(num_classes - 1):
-        booking_limits[i] = max(C_adjusted - protection_levels[i+1], 0)
-    booking_limits[num_classes - 1] = C_adjusted
+    # Calculate expected revenue
+    expected_revenue = sum(fares[i] * booking_limits[i] * probabilities[i] for i in range(n))
     
-    # Print results
-    print("\nEMSR-b Results:")
-    print("Fare Class   | Fare  | Booking Limit")
-    print("-------------|-------|-------------")
-    for i in range(num_classes):
-        print(f"Class {i+1:6} | {fares[i]:5.0f} | {booking_limits[i]:8.2f}")
+    return protection_levels, booking_limits, expected_revenue, sorted_indices
+
+def davn_emsr_b_integration(davn_matrix, product_to_legs, fare, demand, capacity):
+    """
+    Integrate DAVN output with EMSR-b calculation for each leg.
     
-    return fares, booking_limits
+    Parameters:
+    davn_matrix -- the DAVN bid price matrix from DAVN calculation
+    product_to_legs -- mapping of products to legs
+    fare -- original fares for each product
+    demand -- original demand for each product
+    capacity -- capacity for each leg
+    
+    Returns:
+    results -- dictionary with EMSR-b results for each leg
+    """
+    NUMBER_OF_LEGS = capacity.shape[0]
+    results = {}
+    
+    for leg in range(NUMBER_OF_LEGS):
+        # Extract adjusted fares for this leg
+        leg_fares, product_ids = extract_leg_fare_classes(davn_matrix, leg, product_to_legs, fare)
+        
+        if len(leg_fares) == 0:
+            results[leg] = {
+                "leg": leg,
+                "message": "No valid fare classes for this leg",
+                "protection_levels": [],
+                "booking_limits": [],
+                "expected_revenue": 0,
+                "fares": [],
+                "product_ids": []
+            }
+            continue
+        
+        # Get mean demands for these products
+        leg_demands = np.array([demand[p] for p in product_ids])
+        
+        # Hardcoded probabilities for each fare class (adjust as needed)
+        # Higher probabilities for higher fare classes (business logic)
+        probabilities = np.linspace(0.95, 0.75, len(leg_fares))
+        
+        # Calculate EMSR-b
+        protection_levels, booking_limits, expected_revenue, sorted_indices = calculate_emsr_b(
+            leg_fares, 
+            leg_demands, 
+            probabilities,
+            capacity[leg]
+        )
+        
+        # Store results
+        results[leg] = {
+            "leg": leg,
+            "protection_levels": protection_levels,
+            "booking_limits": booking_limits, 
+            "expected_revenue": expected_revenue,
+            "fares": leg_fares[sorted_indices],
+            "product_ids": product_ids[sorted_indices],
+            "demands": leg_demands[sorted_indices],
+            "probabilities": probabilities[sorted_indices]
+        }
+    
+    return results
+
+# Export the functions explicitly
+__all__ = ['calculate_emsr_b', 'davn_emsr_b_integration']

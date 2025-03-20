@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from davn_book_pulp import davn_generator, products_on_leg_finder
 import pulp
+from davn_utils import extract_leg_fare_classes
 
 def calculate_emsr_b(fares, mean_demands, probabilities, capacity):
     """
@@ -63,25 +64,6 @@ def calculate_emsr_b(fares, mean_demands, probabilities, capacity):
     expected_revenue = sum(fares[i] * booking_limits[i] * probabilities[i] for i in range(n))
     
     return protection_levels, booking_limits, expected_revenue, sorted_indices
-
-def extract_leg_fare_classes(davn_matrix, leg, product_to_legs, fare):
-    """
-    Extract adjusted fares for a specific leg from the DAVN matrix.
-    Only returns positive bid prices (valid fare classes).
-    """
-    # Get all products that use this leg
-    products = products_on_leg_finder(leg, product_to_legs)
-    
-    # Extract adjusted fares for these products
-    adjusted_fares = []
-    product_ids = []
-    for p in products:
-        # Only consider valid adjusted fares (positive values)
-        if davn_matrix[p, leg] > 0:
-            adjusted_fares.append(davn_matrix[p, leg])
-            product_ids.append(p)
-    
-    return np.array(adjusted_fares), np.array(product_ids)
 
 def davn_emsr_b_integration(davn_matrix, product_to_legs, fare, demand, capacity):
     """
