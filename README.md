@@ -53,3 +53,13 @@ python davn_emsr_b.py
 ```
 
 This will execute the full pipeline and generate visualizations of the booking limits.
+
+
+
+```python
+# import the libraries
+
+import numpy as np 
+import Pulp
+
+```
