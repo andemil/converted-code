@@ -71,13 +71,13 @@ def display_results(results, data):
     # DAVN Matrix visualization
     st.subheader("DAVN Bid Price Matrix")
     davn_plot = plot_davn_matrix(opt_results['davn_matrix'], data['product_to_legs'])
-    st.image(f"data:image/png;base64,{davn_plot}", use_column_width=True)
+    st.image(f"data:image/png;base64,{davn_plot}", use_container_width=True)
     
     # EMSR-b Results
     st.header("EMSR-b Results by Leg")
     
     booking_limits_plot = plot_results(emsr_results)
-    st.image(f"data:image/png;base64,{booking_limits_plot}", use_column_width=True)
+    st.image(f"data:image/png;base64,{booking_limits_plot}", use_container_width=True)
     
     # Detailed EMSR-b results in expandable sections
     for leg, result in emsr_results.items():
