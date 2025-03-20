@@ -141,11 +141,76 @@ def get_csv_download_link(df, filename, link_text):
 def main():
     st.title("✈️ Airline Revenue Management")
     st.write("### DAVN and EMSR-b Optimization Tool")
+
+    # Add information section
+    with st.expander("About the Optimization Methods"):
+        st.markdown("""
+        ## Introduction to Airline Revenue Management
+
+        Airline revenue management revolves around the challenge of determining which customer bookings to accept and which to reject, aiming to maximize overall revenue. Airlines offer multiple fare classes for the same origin-destination itinerary, each associated with different conditions and privileges. As tickets are sold over time, airlines must strategically adjust fare availability, closing lower fare classes and opening higher ones to optimize profitability.
+
+        The key decision in revenue management is how many seats to allocate to each fare class to strike a balance between high occupancy and maximizing revenue. Allocating too many seats to lower fares may lead to full flights but lower profits, while reserving too many seats for higher fares risks unsold inventory, reducing potential revenue.
+
+        ## Definitions of Key Concepts
+
+        - **Fare Class** ($i$): A category of airline tickets distinguished by price and associated conditions.
+        - **Fare Price** ($f_i$): The price of fare class $i$.
+        - **Protection Level** ($Q_i$): The number of seats reserved for fare classes higher than and including $i$.
+        - **Booking Limit** ($B_i$): The maximum number of seats that can be sold at a specific fare class $i$.
+        - **Demand** ($D_i$): The number of bookings for fare class $i$.
+        - **Leg** ($\\ell$): A single nonstop flight segment operated between two airports.
+        - **Product**: An itinerary (which may contain one or more legs) combined with a fare class.
+
+        ## EMSR-b Heuristic: Booking Limits for a Single Leg
+
+        Littlewood's rule provides the foundation for airline revenue management by addressing the trade-off between selling a seat at a lower fare now versus reserving it for a potentially higher-paying customer in the future. Mathematically, in a two-fare class system, Littlewood's rule states that a seat should be sold at fare $f_1$ if:
+
+        $$f_1 \\geq f_2 \\cdot \\text{Pr}[D_2 > Q_2]$$
+
+        where $\\text{Pr}[D_2 > Q_2]$ represents the probability that demand $D_2$ for the higher fare $f_2$ exceeds the protection level $Q_2$.
+
+        The EMSR-b heuristic generalizes Littlewood's rule to multiple fare classes on a single leg. The process consists of these steps:
+
+        1. **Sort Fare Classes**: Arrange all fare classes in ascending order by fare price.
+        2. **Compute Aggregated Demand and Fares**: For each fare class $i$, define the aggregated demand and fares for all fare classes above and including $i$.
+        3. **Compute Protection Levels**: Determine the protection levels by solving Littlewood's equation.
+        4. **Compute Booking Limits**: The booking limit for each fare class $i$ is given by $B_i = C - Q_{i+1}$, where $C$ is the aircraft capacity.
+
+        ## DAVN Heuristic: Extending EMSR-b to Networks
+
+        While EMSR-b optimizes seat allocations for a single flight leg, the Displacement Adjusted Virtual Nesting (DAVN) heuristic extends this concept to multi-leg itineraries.
+
+        ### Linear Program Formulation
+        DAVN solves the following linear program:
+
+        $$\\max \\sum_{j=1}^{n} f_j x_j$$
+
+        subject to:
+        $$0 \\leq x_j \\leq E[D_j], \\quad \\forall j = 1, 2, ..., n$$
+        $$\\sum_{j \\in A_\\ell} x_j \\leq C_\\ell, \\quad \\forall \\ell = 1, 2, ..., L$$
+
+        where $f_j$ is the fare price of product $j$, $E[D_j]$ is the expected demand for product $j$, $C_\\ell$ is the capacity of leg $\\ell$, and $A_\\ell$ is the set of products using leg $\\ell$.
+
+        ### Computing Displacement Adjusted Revenue (DARE)
+        The displacement adjusted revenue for product $j$ on leg $\\ell$ is computed as:
+
+        $$DARE_j^\\ell = f_j - \\sum_{i \\neq \\ell} \\lambda_i$$
+
+        where $\\lambda_\\ell$ is the dual price (shadow price) of the capacity constraint for leg $\\ell$. These DARE values are then used as fares to apply EMSR-b on each leg separately, in order to determine the booking limits for each leg.
+
+        ### Integrated Approach
+        This application combines both methods:
+        1. DAVN optimization to calculate network-level bid prices using linear programming
+        2. EMSR-b to determine leg-level booking controls based on displacement-adjusted revenues
+
+        This approach provides a comprehensive revenue management solution for airline capacity allocation, taking into account network effects while maintaining practical booking controls at the leg level.
+                    Credit: Andreas
+        """)
     
     # Sidebar for configuration
     st.sidebar.header("Configuration")
     
-    # Removed PuLP/SciPy selection radio button
+
     
     # Data input options
     data_source = st.sidebar.radio(
@@ -236,24 +301,7 @@ def main():
         # Show instructions if no results yet
         st.info("Click 'Run Optimization' to see the results.")
     
-    # Add information section
-    with st.expander("About the Optimization Methods"):
-        st.markdown("""
-        ### DAVN (Displacement Adjusted Virtual Nesting)
-        DAVN is a network revenue management technique that calculates bid prices for each product-leg combination, 
-        accounting for network effects and opportunity costs. It helps airlines decide which bookings to accept to maximize revenue.
-        
-        ### EMSR-b (Expected Marginal Seat Revenue with Bucketing)
-        EMSR-b is a revenue management algorithm that determines optimal protection levels and booking limits for 
-        different fare classes. It helps allocate capacity among fare classes to maximize expected revenue.
-        
-        ### Integrated Approach
-        This application combines both methods:
-        1. DAVN optimization to calculate network-level bid prices using SciPy's linear programming solver
-        2. EMSR-b to determine leg-level booking controls
-        
-        This approach provides a comprehensive revenue management solution for airline capacity allocation.
-        """)
+   
 
 if __name__ == "__main__":
     main()
