@@ -4,11 +4,9 @@ import pandas as pd
 import base64
 from io import BytesIO
 
-# Import custom modules - modifying imports to address the error
+# Import custom modules - removing PuLP dependencies
 from davn_utils import get_default_data, extract_leg_fare_classes
-from davn_optimization import optimize_with_scipy, optimize_with_pulp
-
-# Import directly from the davn_emsr_b.py file instead of emsr_b.py
+from davn_optimization import optimize_with_scipy
 from davn_emsr_b import davn_emsr_b_integration
 from visualization import plot_results, plot_davn_matrix
 
@@ -20,18 +18,15 @@ st.set_page_config(
 )
 
 # Function to run the full optimization pipeline
-def run_optimization(data, optimization_method='pulp'):
+def run_optimization(data):
     # Extract data
     fare = data['fare']
     demand = data['demand']
     capacity = data['capacity']
     product_to_legs = data['product_to_legs']
     
-    # Run optimization
-    if optimization_method == 'pulp':
-        results = optimize_with_pulp(fare, demand, capacity, product_to_legs)
-    else:
-        results = optimize_with_scipy(fare, demand, capacity, product_to_legs)
+    # Run optimization using SciPy only
+    results = optimize_with_scipy(fare, demand, capacity, product_to_legs)
     
     # Extract DAVN matrix
     davn_matrix = results['davn_matrix']
@@ -150,11 +145,7 @@ def main():
     # Sidebar for configuration
     st.sidebar.header("Configuration")
     
-    optimization_method = st.sidebar.radio(
-        "Choose Optimization Method",
-        ("PuLP", "SciPy"),
-        index=0
-    )
+    # Removed PuLP/SciPy selection radio button
     
     # Data input options
     data_source = st.sidebar.radio(
@@ -231,17 +222,14 @@ def main():
     # Run optimization button
     if st.button("Run Optimization"):
         with st.spinner("Running optimization..."):
-            # Run the optimization
-            results = run_optimization(data, optimization_method.lower())
+            # Run the optimization (now only using SciPy)
+            results = run_optimization(data)
             
             # Store results in session state for persistence between reruns
             st.session_state.results = results
             st.session_state.data = data
-            
-            # No need to display results here, will be handled by the code below
     
     # Display results if they exist in session state
-    # This handles both initial calculation and when the app reruns
     if 'results' in st.session_state and 'data' in st.session_state:
         display_results(st.session_state.results, st.session_state.data)
     else:
@@ -261,7 +249,7 @@ def main():
         
         ### Integrated Approach
         This application combines both methods:
-        1. DAVN optimization to calculate network-level bid prices
+        1. DAVN optimization to calculate network-level bid prices using SciPy's linear programming solver
         2. EMSR-b to determine leg-level booking controls
         
         This approach provides a comprehensive revenue management solution for airline capacity allocation.
