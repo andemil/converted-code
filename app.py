@@ -101,34 +101,41 @@ def display_results(results, data):
 
 # Function to handle file upload and data preparation
 def process_uploaded_data(fare_file, demand_file, capacity_file, product_mapping_file):
-    # Process fare data
-    fare_content = fare_file.read()
-    fare = np.loadtxt(BytesIO(fare_content))
-    
-    # Process demand data
-    demand_content = demand_file.read()
-    demand = np.loadtxt(BytesIO(demand_content))
-    
-    # Process capacity data
-    capacity_content = capacity_file.read()
-    capacity = np.loadtxt(BytesIO(capacity_content))
-    
-    # Process product mapping data
-    mapping_content = product_mapping_file.read()
-    product_to_legs = np.loadtxt(BytesIO(mapping_content), dtype=int)
-    
-    # Ensure dimensions are correct
-    NUMBER_OF_PRODUCTS = len(fare)
-    NUMBER_OF_LEGS = len(capacity)
-    
-    return {
-        'NUMBER_OF_PRODUCTS': NUMBER_OF_PRODUCTS,
-        'NUMBER_OF_LEGS': NUMBER_OF_LEGS,
-        'fare': fare,
-        'demand': demand,
-        'capacity': capacity,
-        'product_to_legs': product_to_legs
-    }
+    try:
+        # Process fare data
+        fare_df = pd.read_csv(fare_file, header=None)
+        fare = fare_df.values.flatten()
+        
+        # Process demand data
+        demand_df = pd.read_csv(demand_file, header=None)
+        demand = demand_df.values.flatten()
+        
+        # Process capacity data
+        capacity_df = pd.read_csv(capacity_file, header=None)
+        capacity = capacity_df.values.flatten()
+        
+        # Process product mapping data
+        mapping_df = pd.read_csv(product_mapping_file, header=None)
+        product_to_legs = mapping_df.values.astype(int)
+        
+        # Ensure dimensions are correct
+        NUMBER_OF_PRODUCTS = len(fare)
+        NUMBER_OF_LEGS = len(capacity)
+        
+        st.success("Files successfully loaded!")
+        
+        return {
+            'NUMBER_OF_PRODUCTS': NUMBER_OF_PRODUCTS,
+            'NUMBER_OF_LEGS': NUMBER_OF_LEGS,
+            'fare': fare,
+            'demand': demand,
+            'capacity': capacity,
+            'product_to_legs': product_to_legs
+        }
+    except Exception as e:
+        st.error(f"Error processing files: {str(e)}")
+        st.info("Please make sure your files match the expected format. Download and check the templates for reference.")
+        return None
 
 # Function to generate downloadable CSV template
 def get_csv_download_link(df, filename, link_text):
@@ -280,6 +287,8 @@ def main():
         # Process uploaded files
         if fare_file and demand_file and capacity_file and product_mapping_file:
             data = process_uploaded_data(fare_file, demand_file, capacity_file, product_mapping_file)
+            if data is None:
+                return
         else:
             st.info("Please upload all required files or use default data.")
             return
