@@ -10,6 +10,10 @@ from davn_optimization import optimize_with_scipy
 from davn_emsr_b import davn_emsr_b_integration
 from visualization import plot_results, plot_davn_matrix
 
+###########################################
+# APPLICATION CONFIGURATION
+###########################################
+
 # Set page title and configuration
 st.set_page_config(
     page_title="DAVN & EMSR-b Optimizer",
@@ -71,13 +75,13 @@ def display_results(results, data):
     # DAVN Matrix visualization
     st.subheader("DAVN Bid Price Matrix")
     davn_plot = plot_davn_matrix(opt_results['davn_matrix'], data['product_to_legs'])
-    st.image(f"data:image/png;base64,{davn_plot}", use_container_width=True)
+    st.image(f"data:image/png;base64,{davn_plot}")  # removed use_container_width=True
     
     # EMSR-b Results
     st.header("EMSR-b Results by Leg")
     
     booking_limits_plot = plot_results(emsr_results)
-    st.image(f"data:image/png;base64,{booking_limits_plot}", use_container_width=True)
+    st.image(f"data:image/png;base64,{booking_limits_plot}")  # removed use_container_width=True
     
     # Detailed EMSR-b results in expandable sections
     for leg, result in emsr_results.items():
@@ -99,204 +103,230 @@ def display_results(results, data):
             st.dataframe(leg_df)
             st.metric("Expected Revenue", f"${result['expected_revenue']:.2f}")
 
-# Function to handle file upload and data preparation
-def process_uploaded_data(fare_file, demand_file, capacity_file, product_mapping_file):
-    try:
-        # Process fare data
-        fare_df = pd.read_csv(fare_file, header=None)
-        fare = fare_df.values.flatten()
-        
-        # Process demand data
-        demand_df = pd.read_csv(demand_file, header=None)
-        demand = demand_df.values.flatten()
-        
-        # Process capacity data
-        capacity_df = pd.read_csv(capacity_file, header=None)
-        capacity = capacity_df.values.flatten()
-        
-        # Process product mapping data
-        mapping_df = pd.read_csv(product_mapping_file, header=None)
-        product_to_legs = mapping_df.values.astype(int)
-        
-        # Ensure dimensions are correct
-        NUMBER_OF_PRODUCTS = len(fare)
-        NUMBER_OF_LEGS = len(capacity)
-        
-        st.success("Files successfully loaded!")
-        
-        return {
-            'NUMBER_OF_PRODUCTS': NUMBER_OF_PRODUCTS,
-            'NUMBER_OF_LEGS': NUMBER_OF_LEGS,
-            'fare': fare,
-            'demand': demand,
-            'capacity': capacity,
-            'product_to_legs': product_to_legs
-        }
-    except Exception as e:
-        st.error(f"Error processing files: {str(e)}")
-        st.info("Please make sure your files match the expected format. Download and check the templates for reference.")
-        return None
+###########################################
+# DOCUMENTATION
+###########################################
 
-# Function to generate downloadable CSV template
-def get_csv_download_link(df, filename, link_text):
-    csv = df.to_csv(index=False)
-    b64 = base64.b64encode(csv.encode()).decode()
-    href = f'<a href="data:file/csv;base64,{b64}" download="{filename}">{link_text}</a>'
-    return href
+def show_methodology_information():
+    st.markdown("""
+    ## Introduction to Airline Revenue Management
 
-# Main Streamlit app
+    Airline revenue management revolves around the challenge of determining which customer bookings to accept and which to reject, aiming to maximize overall revenue. Airlines offer multiple fare classes for the same origin-destination itinerary, each associated with different conditions and privileges. As tickets are sold over time, airlines must strategically adjust fare availability, closing lower fare classes and opening higher ones to optimize profitability.
+
+    The key decision in revenue management is how many seats to allocate to each fare class to strike a balance between high occupancy and maximizing revenue. Allocating too many seats to lower fares may lead to full flights but lower profits, while reserving too many seats for higher fares risks unsold inventory, reducing potential revenue.
+
+    ## Definitions of Key Concepts
+
+    - **Fare Class** ($i$): A category of airline tickets distinguished by price and associated conditions.
+    - **Fare Price** ($f_i$): The price of fare class $i$.
+    - **Protection Level** ($Q_i$): The number of seats reserved for fare classes higher than and including $i$.
+    - **Booking Limit** ($B_i$): The maximum number of seats that can be sold at a specific fare class $i$.
+    - **Demand** ($D_i$): The number of bookings for fare class $i$.
+    - **Leg** ($\\ell$): A single nonstop flight segment operated between two airports.
+    - **Product**: An itinerary (which may contain one or more legs) combined with a fare class.
+
+    ## EMSR-b Heuristic: Booking Limits for a Single Leg
+
+    Littlewood's rule provides the foundation for airline revenue management by addressing the trade-off between selling a seat at a lower fare now versus reserving it for a potentially higher-paying customer in the future. Mathematically, in a two-fare class system, Littlewood's rule states that a seat should be sold at fare $f_1$ if:
+
+    $$f_1 \\geq f_2 \\cdot \\text{Pr}[D_2 > Q_2]$$
+
+    where $\\text{Pr}[D_2 > Q_2]$ represents the probability that demand $D_2$ for the higher fare $f_2$ exceeds the protection level $Q_2$.
+
+    The EMSR-b heuristic generalizes Littlewood's rule to multiple fare classes on a single leg. The process consists of these steps:
+
+    1. **Sort Fare Classes**: Arrange all fare classes in ascending order by fare price.
+    2. **Compute Aggregated Demand and Fares**: For each fare class $i$, define the aggregated demand and fares for all fare classes above and including $i$.
+    3. **Compute Protection Levels**: Determine the protection levels by solving Littlewood's equation.
+    4. **Compute Booking Limits**: The booking limit for each fare class $i$ is given by $B_i = C - Q_{i+1}$, where $C$ is the aircraft capacity.
+
+    ## DAVN Heuristic: Extending EMSR-b to Networks
+
+    While EMSR-b optimizes seat allocations for a single flight leg, the Displacement Adjusted Virtual Nesting (DAVN) heuristic extends this concept to multi-leg itineraries.
+
+    ### Linear Program Formulation
+    DAVN solves the following linear program:
+
+    $$\\max \\sum_{j=1}^{n} f_j x_j$$
+
+    subject to:
+    $$0 \\leq x_j \\leq E[D_j], \\quad \\forall j = 1, 2, ..., n$$
+    $$\\sum_{j \\in A_\\ell} x_j \\leq C_\\ell, \\quad \\forall \\ell = 1, 2, ..., L$$
+
+    where $f_j$ is the fare price of product $j$, $E[D_j]$ is the expected demand for product $j$, $C_\\ell$ is the capacity of leg $\\ell$, and $A_\\ell$ is the set of products using leg $\\ell$.
+
+    ### Computing Displacement Adjusted Revenue (DARE)
+    The displacement adjusted revenue for product $j$ on leg $\\ell$ is computed as:
+
+    $$DARE_j^\\ell = f_j - \\sum_{i \\neq \\ell} \\lambda_i$$
+
+    where $\\lambda_\\ell$ is the dual price (shadow price) of the capacity constraint for leg $\\ell$. These DARE values are then used as fares to apply EMSR-b on each leg separately, in order to determine the booking limits for each leg.
+
+    ### Integrated Approach
+    This application combines both methods:
+    1. DAVN optimization to calculate network-level bid prices using linear programming
+    2. EMSR-b to determine leg-level booking controls based on displacement-adjusted revenues
+
+    This approach provides a comprehensive revenue management solution for airline capacity allocation, taking into account network effects while maintaining practical booking controls at the leg level.
+                Credit: Andreas
+    """)
+
+###########################################
+# DATA MANAGEMENT FUNCTIONS
+###########################################
+
+def edit_data():
+    """Function to display and edit the default dataset"""
+    data = get_default_data()
+    
+    st.subheader("Data Editor")
+    
+    with st.expander("Data Explanation", expanded=True):
+        st.markdown("""
+        ### Understanding the Data Structure
+        
+        - **Fares**: Each row represents a product (combination of itinerary and fare class).
+          The fare is the price of that product.
+          
+        - **Demand**: Each row represents the expected demand for a product.
+          
+        - **Capacity**: Each row represents the seat capacity for a leg (flight segment).
+          
+        - **Product-to-Legs Mapping**: This matrix shows which legs are used by each product.
+          - Each row corresponds to a product
+          - Each product can use up to 2 legs
+          - Values 0-5 indicate which leg is used (leg index)
+          - Value -1 means "no leg" (for products that use only one leg)
+          - Column 0 is the first leg of the product, Column 1 is the second leg (if applicable)
+        """)
+    
+    # Add controls to change the number of products and legs
+    st.subheader("Configuration Settings")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        current_num_products = len(data['fare'])
+        num_products = st.number_input("Number of Products", min_value=1, max_value=100, value=current_num_products, step=1)
+    
+    with col2:
+        current_num_legs = len(data['capacity'])
+        num_legs = st.number_input("Number of Legs", min_value=1, max_value=50, value=current_num_legs, step=1)
+    
+    # Resize data structures if the number of products or legs changes
+    if num_products != current_num_products or num_legs != current_num_legs:
+        # Resize fare and demand arrays
+        if num_products > current_num_products:
+            # Add new products with default values
+            data['fare'] = np.append(data['fare'], np.ones(num_products - current_num_products) * 500)  # Default fare: 500
+            data['demand'] = np.append(data['demand'], np.ones(num_products - current_num_products) * 50)  # Default demand: 50
+        else:
+            # Truncate to fewer products
+            data['fare'] = data['fare'][:num_products]
+            data['demand'] = data['demand'][:num_products]
+        
+        # Resize capacity array
+        if num_legs > current_num_legs:
+            # Add new legs with default capacity
+            data['capacity'] = np.append(data['capacity'], np.ones(num_legs - current_num_legs) * 100)  # Default capacity: 100
+        else:
+            # Truncate to fewer legs
+            data['capacity'] = data['capacity'][:num_legs]
+        
+        # Resize product_to_legs mapping
+        new_mapping = np.ones((num_products, 2), dtype=int) * -1  # Default: no leg (-1)
+        
+        # Copy existing values where possible
+        min_products = min(num_products, current_num_products)
+        for i in range(min_products):
+            for j in range(min(2, data['product_to_legs'].shape[1])):
+                # Only copy valid leg indices that still exist
+                leg_idx = data['product_to_legs'][i, j]
+                if leg_idx >= 0 and leg_idx < num_legs:
+                    new_mapping[i, j] = leg_idx
+                else:
+                    new_mapping[i, j] = -1  # Invalid leg becomes "no leg"
+        
+        data['product_to_legs'] = new_mapping
+    
+    # Continue with data editing as before
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Create editable dataframes with row labels
+        st.subheader("Fares (by Product)")
+        fares_df = pd.DataFrame({
+            "Product": [f"Product {i+1}" for i in range(len(data['fare']))],
+            "Fare": data['fare']
+        }).set_index("Product")
+        fares_edited = st.data_editor(fares_df)
+        data['fare'] = fares_edited["Fare"].values
+        
+        st.subheader("Capacity (by Leg)")
+        capacity_df = pd.DataFrame({
+            "Leg": [f"Leg {i+1}" for i in range(len(data['capacity']))],
+            "Capacity": data['capacity']
+        }).set_index("Leg")
+        capacity_edited = st.data_editor(capacity_df)
+        data['capacity'] = capacity_edited["Capacity"].values
+    
+    with col2:
+        st.subheader("Demand (by Product)")
+        demand_df = pd.DataFrame({
+            "Product": [f"Product {i+1}" for i in range(len(data['demand']))],
+            "Demand": data['demand']
+        }).set_index("Product")
+        demand_edited = st.data_editor(demand_df)
+        data['demand'] = demand_edited["Demand"].values
+    
+    st.subheader("Product-to-Legs Mapping")
+    # Display a warning about valid leg indices
+    st.info(f"For the mapping below, use values 0-{num_legs-1} to specify which leg is used, or -1 for 'no leg'.")
+    # Create a dataframe with row and column labels for better understanding
+    mapping_df = pd.DataFrame(
+        data['product_to_legs'],
+        index=[f"Product {i+1}" for i in range(data['product_to_legs'].shape[0])],
+        columns=["First Leg", "Second Leg"]
+    )
+    mapping_edited = st.data_editor(mapping_df)
+    
+    # Validate leg indices to ensure they're within range
+    valid_mapping = mapping_edited.values.copy()
+    for i in range(valid_mapping.shape[0]):
+        for j in range(valid_mapping.shape[1]):
+            if valid_mapping[i, j] >= num_legs or valid_mapping[i, j] < -1:
+                valid_mapping[i, j] = -1  # Reset invalid indices to -1
+    
+    data['product_to_legs'] = valid_mapping
+    
+    # Update the data structure with new dimensions
+    data['NUMBER_OF_PRODUCTS'] = num_products
+    data['NUMBER_OF_LEGS'] = num_legs
+    
+    return data
+
+###########################################
+# MAIN APPLICATION
+###########################################
+
 def main():
+    # Application title and header
     st.title("✈️ Airline Revenue Management")
     st.write("### DAVN and EMSR-b Optimization Tool")
 
-    # Add information section
+    # Documentation
     with st.expander("About the Optimization Methods"):
-        st.markdown("""
-        ## Introduction to Airline Revenue Management
-
-        Airline revenue management revolves around the challenge of determining which customer bookings to accept and which to reject, aiming to maximize overall revenue. Airlines offer multiple fare classes for the same origin-destination itinerary, each associated with different conditions and privileges. As tickets are sold over time, airlines must strategically adjust fare availability, closing lower fare classes and opening higher ones to optimize profitability.
-
-        The key decision in revenue management is how many seats to allocate to each fare class to strike a balance between high occupancy and maximizing revenue. Allocating too many seats to lower fares may lead to full flights but lower profits, while reserving too many seats for higher fares risks unsold inventory, reducing potential revenue.
-
-        ## Definitions of Key Concepts
-
-        - **Fare Class** ($i$): A category of airline tickets distinguished by price and associated conditions.
-        - **Fare Price** ($f_i$): The price of fare class $i$.
-        - **Protection Level** ($Q_i$): The number of seats reserved for fare classes higher than and including $i$.
-        - **Booking Limit** ($B_i$): The maximum number of seats that can be sold at a specific fare class $i$.
-        - **Demand** ($D_i$): The number of bookings for fare class $i$.
-        - **Leg** ($\\ell$): A single nonstop flight segment operated between two airports.
-        - **Product**: An itinerary (which may contain one or more legs) combined with a fare class.
-
-        ## EMSR-b Heuristic: Booking Limits for a Single Leg
-
-        Littlewood's rule provides the foundation for airline revenue management by addressing the trade-off between selling a seat at a lower fare now versus reserving it for a potentially higher-paying customer in the future. Mathematically, in a two-fare class system, Littlewood's rule states that a seat should be sold at fare $f_1$ if:
-
-        $$f_1 \\geq f_2 \\cdot \\text{Pr}[D_2 > Q_2]$$
-
-        where $\\text{Pr}[D_2 > Q_2]$ represents the probability that demand $D_2$ for the higher fare $f_2$ exceeds the protection level $Q_2$.
-
-        The EMSR-b heuristic generalizes Littlewood's rule to multiple fare classes on a single leg. The process consists of these steps:
-
-        1. **Sort Fare Classes**: Arrange all fare classes in ascending order by fare price.
-        2. **Compute Aggregated Demand and Fares**: For each fare class $i$, define the aggregated demand and fares for all fare classes above and including $i$.
-        3. **Compute Protection Levels**: Determine the protection levels by solving Littlewood's equation.
-        4. **Compute Booking Limits**: The booking limit for each fare class $i$ is given by $B_i = C - Q_{i+1}$, where $C$ is the aircraft capacity.
-
-        ## DAVN Heuristic: Extending EMSR-b to Networks
-
-        While EMSR-b optimizes seat allocations for a single flight leg, the Displacement Adjusted Virtual Nesting (DAVN) heuristic extends this concept to multi-leg itineraries.
-
-        ### Linear Program Formulation
-        DAVN solves the following linear program:
-
-        $$\\max \\sum_{j=1}^{n} f_j x_j$$
-
-        subject to:
-        $$0 \\leq x_j \\leq E[D_j], \\quad \\forall j = 1, 2, ..., n$$
-        $$\\sum_{j \\in A_\\ell} x_j \\leq C_\\ell, \\quad \\forall \\ell = 1, 2, ..., L$$
-
-        where $f_j$ is the fare price of product $j$, $E[D_j]$ is the expected demand for product $j$, $C_\\ell$ is the capacity of leg $\\ell$, and $A_\\ell$ is the set of products using leg $\\ell$.
-
-        ### Computing Displacement Adjusted Revenue (DARE)
-        The displacement adjusted revenue for product $j$ on leg $\\ell$ is computed as:
-
-        $$DARE_j^\\ell = f_j - \\sum_{i \\neq \\ell} \\lambda_i$$
-
-        where $\\lambda_\\ell$ is the dual price (shadow price) of the capacity constraint for leg $\\ell$. These DARE values are then used as fares to apply EMSR-b on each leg separately, in order to determine the booking limits for each leg.
-
-        ### Integrated Approach
-        This application combines both methods:
-        1. DAVN optimization to calculate network-level bid prices using linear programming
-        2. EMSR-b to determine leg-level booking controls based on displacement-adjusted revenues
-
-        This approach provides a comprehensive revenue management solution for airline capacity allocation, taking into account network effects while maintaining practical booking controls at the leg level.
-                    Credit: Andreas
-        """)
+        show_methodology_information()
     
-    # Sidebar for configuration
+    # Sidebar for configuration (simplified)
     st.sidebar.header("Configuration")
     
-
-    
-    # Data input options
-    data_source = st.sidebar.radio(
-        "Data Source",
-        ("Use Default Data", "Upload Custom Data"),
-        index=0
-    )
-    
-    # Load or prepare data
-    if data_source == "Use Default Data":
-        data = get_default_data()
-        
-        # Allow editing of default data
-        if st.sidebar.checkbox("Edit Default Data"):
-            with st.expander("Edit Default Data"):
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    # Create editable dataframes
-                    st.subheader("Fares")
-                    fares_df = pd.DataFrame({"Fare": data['fare']})
-                    fares_edited = st.data_editor(fares_df)
-                    data['fare'] = fares_edited["Fare"].values
-                    
-                    st.subheader("Capacity")
-                    capacity_df = pd.DataFrame({"Capacity": data['capacity']})
-                    capacity_edited = st.data_editor(capacity_df)
-                    data['capacity'] = capacity_edited["Capacity"].values
-                
-                with col2:
-                    st.subheader("Demand")
-                    demand_df = pd.DataFrame({"Demand": data['demand']})
-                    demand_edited = st.data_editor(demand_df)
-                    data['demand'] = demand_edited["Demand"].values
-                    
-                st.subheader("Product-to-Legs Mapping")
-                mapping_df = pd.DataFrame(data['product_to_legs'])
-                mapping_edited = st.data_editor(mapping_df)
-                data['product_to_legs'] = mapping_edited.values
-                
-    else:
-        # File upload section
-        st.sidebar.subheader("Upload Data Files")
-        
-        # Allow downloading templates
-        st.sidebar.markdown("### Download Templates")
-        
-        # Create template dataframes
-        default_data = get_default_data()
-        fares_template = pd.DataFrame({"Fare": default_data['fare']})
-        demand_template = pd.DataFrame({"Demand": default_data['demand']})
-        capacity_template = pd.DataFrame({"Capacity": default_data['capacity']})
-        mapping_template = pd.DataFrame(default_data['product_to_legs'])
-        
-        # Add download links
-        st.sidebar.markdown(get_csv_download_link(fares_template, "fares_template.csv", "Download Fares Template"), unsafe_allow_html=True)
-        st.sidebar.markdown(get_csv_download_link(demand_template, "demand_template.csv", "Download Demand Template"), unsafe_allow_html=True)
-        st.sidebar.markdown(get_csv_download_link(capacity_template, "capacity_template.csv", "Download Capacity Template"), unsafe_allow_html=True)
-        st.sidebar.markdown(get_csv_download_link(mapping_template, "mapping_template.csv", "Download Mapping Template"), unsafe_allow_html=True)
-        
-        # File uploaders
-        fare_file = st.sidebar.file_uploader("Upload Fares (CSV)", type=["csv", "txt"])
-        demand_file = st.sidebar.file_uploader("Upload Demand (CSV)", type=["csv", "txt"])
-        capacity_file = st.sidebar.file_uploader("Upload Capacity (CSV)", type=["csv", "txt"])
-        product_mapping_file = st.sidebar.file_uploader("Upload Product-to-Legs Mapping (CSV)", type=["csv", "txt"])
-        
-        # Process uploaded files
-        if fare_file and demand_file and capacity_file and product_mapping_file:
-            data = process_uploaded_data(fare_file, demand_file, capacity_file, product_mapping_file)
-            if data is None:
-                return
-        else:
-            st.info("Please upload all required files or use default data.")
-            return
+    # Display editable data directly (no option to switch to custom upload)
+    data = edit_data()
     
     # Run optimization button
     if st.button("Run Optimization"):
         with st.spinner("Running optimization..."):
-            # Run the optimization (now only using SciPy)
+            # Run the optimization
             results = run_optimization(data)
             
             # Store results in session state for persistence between reruns
@@ -309,8 +339,7 @@ def main():
     else:
         # Show instructions if no results yet
         st.info("Click 'Run Optimization' to see the results.")
-    
-   
 
+# Run the application
 if __name__ == "__main__":
     main()
