@@ -168,7 +168,6 @@ def show_methodology_information():
     2. EMSR-b to determine leg-level booking controls based on displacement-adjusted revenues
 
     This approach provides a comprehensive revenue management solution for airline capacity allocation, taking into account network effects while maintaining practical booking controls at the leg level.
-                Credit: Andreas
     """)
 
 ###########################################
@@ -201,7 +200,7 @@ def edit_data():
         """)
     
     # Add controls to change the number of products and legs
-    st.subheader("Configuration Settings")
+    # st.subheader("Configuration Settings")
     col1, col2 = st.columns(2)
     
     with col1:
@@ -317,8 +316,6 @@ def main():
     with st.expander("About the Optimization Methods"):
         show_methodology_information()
     
-    # Sidebar for configuration (simplified)
-    st.sidebar.header("Configuration")
     
     # Display editable data directly (no option to switch to custom upload)
     data = edit_data()
