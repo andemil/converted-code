@@ -191,12 +191,20 @@ def edit_data():
           
         - **Capacity**: Each row represents the seat capacity for a leg (flight segment).
           
-        - **Product-to-Legs Mapping**: This matrix shows which legs are used by each product.
-          - Each row corresponds to a product
-          - Each product can use up to 2 legs
-          - Values 0-5 indicate which leg is used (leg index)
+        - **Product-to-Legs Mapping**: This matrix is critical for the optimization algorithm:
+          - Each row represents a product (product 1 is row 0, product 2 is row 1, etc.)
+          - The first column specifies the first leg used by the product
+          - The second column specifies the second leg used by the product (if applicable)
+          - Values 0-{num_legs-1} indicate the leg index (leg 1 is represented by 0, leg 2 by 1, etc.)
           - Value -1 means "no leg" (for products that use only one leg)
-          - Column 0 is the first leg of the product, Column 1 is the second leg (if applicable)
+          
+          For example, in the default data:
+          - Products 1-6 each use only one leg (legs 1-6 respectively)
+          - Product 7 uses legs 2 and 3
+          - Product 8 uses legs 1 and 4
+          - And so on...
+          
+          This mapping is essential for the DAVN algorithm to work correctly.
         """)
     
     # Add controls to change the number of products and legs
@@ -278,8 +286,17 @@ def edit_data():
         data['demand'] = demand_edited["Demand"].values
     
     st.subheader("Product-to-Legs Mapping")
-    # Display a warning about valid leg indices
-    st.info(f"For the mapping below, use values 0-{num_legs-1} to specify which leg is used, or -1 for 'no leg'.")
+    # Enhanced warning about valid leg indices and importance of this matrix
+    st.warning("""
+    **Important**: This matrix defines which legs each product uses. Without correct mapping, the optimization will return incorrect results.
+    
+    - Each row represents a product
+    - First column = first leg used by the product
+    - Second column = second leg used by the product (or -1 if only one leg is used)
+    - Use values 0-{} to specify leg indices (0=leg 1, 1=leg 2, etc.)
+    - Use -1 to indicate no leg
+    """.format(num_legs-1))
+    
     # Create a dataframe with row and column labels for better understanding
     mapping_df = pd.DataFrame(
         data['product_to_legs'],
