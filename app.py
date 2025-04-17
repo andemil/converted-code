@@ -109,65 +109,55 @@ def display_results(results, data):
 
 def show_methodology_information():
     st.markdown("""
-    ## Introduction to Airline Revenue Management
+    ## Optimizing Seat Allocation to Maximize Airline Revenue
 
-    Airline revenue management revolves around the challenge of determining which customer bookings to accept and which to reject, aiming to maximize overall revenue. Airlines offer multiple fare classes for the same origin-destination itinerary, each associated with different conditions and privileges. As tickets are sold over time, airlines must strategically adjust fare availability, closing lower fare classes and opening higher ones to optimize profitability.
+    Airlines face a daily challenge: how to best manage limited seat capacity on their flights while
+    maximizing revenue. The key lies in offering the right seats, at the right price, to the right customers
+    — and knowing when to say no to low-fare bookings in hopes of selling those seats at a higher price
+    later.
 
-    The key decision in revenue management is how many seats to allocate to each fare class to strike a balance between high occupancy and maximizing revenue. Allocating too many seats to lower fares may lead to full flights but lower profits, while reserving too many seats for higher fares risks unsold inventory, reducing potential revenue.
+    This is the essence of airline revenue management. Airlines don't just sell one type of ticket — they
+    offer multiple fare classes for the same route, ranging from economy saver fares to flexible business
+    class tickets. Each fare class has different prices and conditions, and customer demand for these fares
+    fluctuates over time.
 
-    ## Definitions of Key Concepts
+    To make the most out of every flight, airlines use smart optimization techniques to decide:
+    
+    • How many seats should be available at each fare level?
+    • When should a cheaper fare stop being offered?
+    • How can the value of a seat be assessed when multiple itineraries overlap across a network
+    of flights?
 
-    - **Fare Class** ($i$): A category of airline tickets distinguished by price and associated conditions.
-    - **Fare Price** ($f_i$): The price of fare class $i$.
-    - **Protection Level** ($Q_i$): The number of seats reserved for fare classes higher than and including $i$.
-    - **Booking Limit** ($B_i$): The maximum number of seats that can be sold at a specific fare class $i$.
-    - **Demand** ($D_i$): The number of bookings for fare class $i$.
-    - **Leg** ($\\ell$): A single nonstop flight segment operated between two airports.
-    - **Product**: An itinerary (which may contain one or more legs) combined with a fare class.
+    ### From Single Flights to Complex Networks
+    
+    The EMSR-b heuristic, helps airlines set limits on how many tickets to sell at each price level. It uses
+    historical demand data to strike a balance: selling seats early at a lower price versus waiting to sell
+    them later at a higher price.
+    
+    However, in real-world airline operations, things are more complicated. Many customers book trips
+    that involve multiple connecting flights, and a seat on one leg of a journey may be shared across
+    many different itineraries.
+    
+    To handle this, our approach uses a method called Displacement Adjusted Virtual Nesting (DAVN).
+    This method helps airlines make smarter decisions by considering the entire flight network. It
+    estimates the true revenue value of each ticket, accounting for the opportunity cost of assigning a
+    seat to one itinerary instead of another.
+    
+    Using a combination of:
+    
+    • Linear programming to optimize revenue across the network, and
+    • Heuristic rules to manage booking decisions at the individual flight level,
+    
+    ...this integrated system enables airlines to manage bookings in a way that is both strategically
+    optimal and operationally practical.
 
-    ## EMSR-b Heuristic: Booking Limits for a Single Leg
-
-    Littlewood's rule provides the foundation for airline revenue management by addressing the trade-off between selling a seat at a lower fare now versus reserving it for a potentially higher-paying customer in the future. Mathematically, in a two-fare class system, Littlewood's rule states that a seat should be sold at fare $f_1$ if:
-
-    $$f_1 \\geq f_2 \\cdot \\text{Pr}[D_2 > Q_2]$$
-
-    where $\\text{Pr}[D_2 > Q_2]$ represents the probability that demand $D_2$ for the higher fare $f_2$ exceeds the protection level $Q_2$.
-
-    The EMSR-b heuristic generalizes Littlewood's rule to multiple fare classes on a single leg. The process consists of these steps:
-
-    1. **Sort Fare Classes**: Arrange all fare classes in ascending order by fare price.
-    2. **Compute Aggregated Demand and Fares**: For each fare class $i$, define the aggregated demand and fares for all fare classes above and including $i$.
-    3. **Compute Protection Levels**: Determine the protection levels by solving Littlewood's equation.
-    4. **Compute Booking Limits**: The booking limit for each fare class $i$ is given by $B_i = C - Q_{i+1}$, where $C$ is the aircraft capacity.
-
-    ## DAVN Heuristic: Extending EMSR-b to Networks
-
-    While EMSR-b optimizes seat allocations for a single flight leg, the Displacement Adjusted Virtual Nesting (DAVN) heuristic extends this concept to multi-leg itineraries.
-
-    ### Linear Program Formulation
-    DAVN solves the following linear program:
-
-    $$\\max \\sum_{j=1}^{n} f_j x_j$$
-
-    subject to:
-    $$0 \\leq x_j \\leq E[D_j], \\quad \\forall j = 1, 2, ..., n$$
-    $$\\sum_{j \\in A_\\ell} x_j \\leq C_\\ell, \\quad \\forall \\ell = 1, 2, ..., L$$
-
-    where $f_j$ is the fare price of product $j$, $E[D_j]$ is the expected demand for product $j$, $C_\\ell$ is the capacity of leg $\\ell$, and $A_\\ell$ is the set of products using leg $\\ell$.
-
-    ### Computing Displacement Adjusted Revenue (DARE)
-    The displacement adjusted revenue for product $j$ on leg $\\ell$ is computed as:
-
-    $$DARE_j^\\ell = f_j - \\sum_{i \\neq \\ell} \\lambda_i$$
-
-    where $\\lambda_\\ell$ is the dual price (shadow price) of the capacity constraint for leg $\\ell$. These DARE values are then used as fares to apply EMSR-b on each leg separately, in order to determine the booking limits for each leg.
-
-    ### Integrated Approach
-    This application combines both methods:
-    1. DAVN optimization to calculate network-level bid prices using linear programming
-    2. EMSR-b to determine leg-level booking controls based on displacement-adjusted revenues
-
-    This approach provides a comprehensive revenue management solution for airline capacity allocation, taking into account network effects while maintaining practical booking controls at the leg level.
+    ### The Big Picture
+    
+    This solution gives airlines a powerful tool to improve profitability without adding more flights or
+    seats. By making informed booking decisions backed by optimization models, airlines can increase
+    revenue, manage uncertainty in demand, and better utilize their limited capacity.
+    
+    For readers interested in the full mathematical model and formulation, please see [this PDF](https://drive.google.com/file/d/1ezOJL3COfIRSI4bEX_xcEzGp3rK6fjuO/view?usp=sharing).
     """)
 
 ###########################################
