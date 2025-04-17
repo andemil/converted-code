@@ -124,7 +124,9 @@ def show_methodology_information():
     To make the most out of every flight, airlines use smart optimization techniques to decide:
     
     • How many seats should be available at each fare level?
+                
     • When should a cheaper fare stop being offered?
+                
     • How can the value of a seat be assessed when multiple itineraries overlap across a network
     of flights?
 
@@ -146,9 +148,10 @@ def show_methodology_information():
     Using a combination of:
     
     • Linear programming to optimize revenue across the network, and
-    • Heuristic rules to manage booking decisions at the individual flight level,
+                
+    • Heuristic rules to manage booking decisions at the individual flight level.
     
-    ...this integrated system enables airlines to manage bookings in a way that is both strategically
+    This integrated system enables airlines to manage bookings in a way that is both strategically
     optimal and operationally practical.
 
     ### The Big Picture

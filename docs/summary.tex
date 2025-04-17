@@ -1,0 +1,196 @@
+\documentclass{article}
+\usepackage{fullpage}
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{graphicx}
+
+\begin{document}
+
+\title{EMSR-b and DAVN Heuristics in Airline Revenue Management}
+\author{}
+\date{}
+\maketitle
+
+\section{Introduction}
+
+Airline revenue management revolves around the challenge of determining which 
+customer bookings to accept and which to reject, aiming to maximize overall 
+revenue. Airlines offer multiple fare classes for the same origin-destination 
+itinerary, each associated with different conditions and privileges. As tickets 
+are sold over time, airlines must strategically adjust fare availability, 
+closing lower fare classes and opening higher ones to optimize profitability.
+
+Passengers in the economy cabin typically have access to several fare classes, 
+even though all seats in that cabin are physically identical. Lower fare classes 
+tend to sell out earlier due to higher demand, while higher fare classes may 
+remain available longer, often offering additional benefits such as flexible 
+cancellations or priority boarding. While customers who book early often choose 
+lower fares, some may still opt for premium fares despite cheaper options being 
+available. Airlines frequently adjust pricing based on factors such as remaining 
+time before departure, demand patterns, and customer preferences to enhance 
+revenue.
+
+The key decision in revenue management is how many seats to allocate to each 
+fare class to strike a balance between high occupancy and maximizing revenue. 
+Allocating too many seats to lower fares may lead to full flights but lower 
+profits, while reserving too many seats for higher fares risks unsold inventory, 
+reducing potential revenue. Thus, airlines must carefully manage seat 
+allocations to avoid these extremes.
+
+Additionally, airline seats are a perishable resource—once a flight departs, any 
+unsold seat represents lost revenue. To mitigate this, airlines employ 
+overbooking strategies, selling more tickets than available seats to compensate 
+for expected cancellations and no-shows. However, if more passengers show up 
+than seats available, the airline incurs costs by compensating displaced 
+travelers and arranging alternative flights. The complexity of revenue 
+management arises from fluctuating demand, cancellation rates, and overbooking 
+risks, all of which require airlines to make data-driven decisions on pricing 
+and seat allocation.
+
+The Expected Marginal Seat Revenue (EMSR-b) heuristic is widely used to 
+determine seat allocations among different fare classes dynamically. It extends 
+Littlewood’s rule by incorporating multiple fare classes and probabilistic 
+demand forecasts. The Displacement Adjusted Virtual Nesting (DAVN) heuristic 
+builds upon EMSR-b to handle multi-leg airline networks, taking into account how 
+bookings on one leg impact availability across the network, thereby optimizing 
+revenue across multiple connected flights.
+
+\section{Definitions of Key Concepts}
+Before delving into the EMSR-b and DAVN heuristics, we define some key technical 
+terms:
+\begin{itemize}
+    \item \textbf{Fare Class} ($i$): A category of airline tickets distinguished 
+by price and associated conditions (e.g., refundable vs. non-refundable).
+    \item \textbf{Fare Price} ($f_i$): The price of fare class $i$.
+    \item \textbf{Protection Level} ($Q_i$): The number of seats reserved for 
+fare classes higher than and including~$i$ to ensure that they are available for 
+potential high-revenue passengers. There is no protection level for the class 
+with lowest fare.
+    \item \textbf{Booking Limit} ($B_i$): The maximum number of seats that can 
+be sold at a specific fare class $i$.
+    \item \textbf{Demand} ($D_i$):
+    % \item \textbf{Demand Distribution}: The statistical representation of 
+% expected customer demand for each fare class, typically modeled using a normal 
+% distribution.
+    % \item \textbf{Revenue Management}: The practice of dynamically adjusting 
+% seat allocations to maximize revenue while considering demand uncertainty.
+    % \item \textbf{Displacement Cost}: The opportunity cost of accepting a 
+% booking, which might prevent a more profitable booking later.
+\end{itemize}
+
+\section{EMSR-b Heuristic: Booking limits for a single leg}
+
+Littlewood’s rule provides the foundation for airline revenue management by 
+addressing the trade-off between selling a seat at a lower fare now versus 
+reserving it for a potentially higher-paying customer in the future. The key 
+idea is that an airline should accept a booking at a lower fare only if the 
+expected revenue from selling it now is at least as great as the expected 
+revenue from saving it for a later, higher-fare customer.
+
+Mathematically, in a two-fare class system, Littlewood’s rule states that a seat 
+should be sold at fare $f_1$ if
+\[
+    f_1 \geq f_2\cdot \Pr[D_2 > Q_2],
+\]
+where $\Pr[D_2 > Q_2]$ represents the probability that demand $D_2$ for the 
+higher fare $f_2$ exceeds the protection level~$Q_2$. If this probability is 
+high, the airline should protect more seats for high-fare customers. If it is 
+low, the airline can safely sell more seats at the lower fare.
+
+The EMSR-b heuristic generalizes Littlewood’s rule to multiple fare classes. 
+Instead of considering only two fares, EMSR-b calculates a cumulative demand 
+distribution for all fare classes above a given class and determines seat 
+protection levels accordingly. The core idea remains the same: balance the 
+trade-off between immediate revenue and potential higher future revenue.
+
+By considering aggregated demand distributions and adjusting booking limits 
+dynamically, EMSR-b enables airlines to make optimal seat allocation decisions 
+that maximize total expected revenue.
+
+The process consists of the following steps to compute the booking limits of the 
+fare classes. Other data, such as airplane capacity, fare prices, demands, and 
+demand distributions, are assumed to be part of the input.
+
+\subsubsection*{Step 1: Sorting Fare Classes}
+Sort all fare classes in ascending order by fare price, such that
+\[
+    f_1 \leq f_2 \leq \dots \leq f_n.
+\]
+
+\subsubsection*{Step 2: Compute Aggregated Demand and Fares}
+For each fare class $i$, define the aggregated demand for all fare classes above 
+and including $i$:
+\[
+    D_{\geq i} = \sum_{j=i}^{n} D_j,
+\]
+and the aggregate fares as
+\[
+    f_{\geq i} =  \frac{\sum_{j=i}^{n} f_j \cdot E[D_j]}{\sum_{j=i}^{n} E[D_j]}.
+\]
+% Assume demand follows a normal distribution with mean and variance:
+% \[
+%     \mu_{\geq i} = \sum_{j=i}^{n} \mu_j, \quad \sigma_{\geq i}^2 = 
+% \sum_{j=i}^{n} \sigma_j^2.
+% \]
+
+\subsubsection*{Step 3: Compute Protection Levels}
+The lowest fare class $1$ has no protection level as no protection is needed for 
+the lowest fare.
+For the remaining fare classes, determine the protection levels by solving 
+Littlewood’s equation for $Q_{i+1}$:
+\[
+    f_i = f_{\geq i+1} \cdot \Pr[D_{i+1} > Q_{i+1}].
+\]
+A common assumption is that the arrivals are Poisson distributed, which means 
+the inverse cumulative distribution function of the Poisson distribution can be 
+used to solve for protection level~$Q_{i+1}$ in Littlewood's equation.
+% where $z_i$ is the critical fractile computed as $z_i = \Phi^{-1} \left( 
+% \frac{f_i}{f_n} \right)$,
+% and $\Phi^{-1}$ is the inverse of the cumulative distribution function of the 
+% normal distribution.
+
+\subsubsection*{Step 4: Compute Booking Limits}
+The booking limit for each fare class $i<n$ is given by:
+\[
+    B_i = C - Q_{i+1}.
+\]
+For the highest fare class, $B_n = C$, where $C$ is the capacity of the 
+airplane.
+
+The booking limit essentially means that once $B_i$ seats have been reserved in 
+class $i$, no additional bookings are permitted for that class. When overbooking 
+is taken into account, $C$ is replaced with $C / (1 + cp)$ above, where $cp$ 
+represents the average cancellation probability across all fare classes. This 
+modification temporarily increases the available capacity during the booking 
+process to account for expected cancellations.
+
+\section{The DAVN Heuristic: Extending EMSR-b to Networks}
+While EMSR-b optimizes seat allocations for a single flight leg, the DAVN 
+heuristic extends this concept to multi-leg itineraries.
+
+\subsection{Linear Program Formulation}
+The DAVN heuristic solves the following linear program:
+\[
+    \max \sum_{j=1}^{n} f_j x_j
+\]
+subject to:
+\begin{align*}
+    0 \leq x_j \leq E[D_j], \quad &\forall j = 1, 2, ..., n\\
+    \sum_{j \in A_\ell} x_j \leq C_\ell,\quad &\forall \ell = 1, 2, ..., L 
+\qquad\qquad (\star)
+\end{align*}
+where $f_j$ is the fare price of product $j$, $E[D_j]$ is the expected demand 
+for product $j$, $C_\ell$ is the capacity of leg~$\ell$, and $A_\ell$ is the set 
+of products using leg~$\ell$.
+
+\subsection{Computing Displacement Adjusted Revenue (DARE)}
+The displacement adjusted revenue (DARE) for product $j$ on leg $\ell$ is 
+computed as:
+\[
+    DARE_j^\ell = f_j - \sum_{i \neq \ell} \lambda_i,
+\]
+where $\lambda_\ell$ is the dual price of constraint $(\star)$ for leg $\ell$. 
+These DARE values are then used as fares to apply EMSR-b on each leg separately, 
+in order to determine the booking limits for each leg.
+
+
+\end{document}
